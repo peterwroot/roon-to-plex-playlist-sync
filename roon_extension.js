@@ -51,7 +51,9 @@ const directPort = portIdx !== -1 && hostIdx !== -1 ? parseInt(cliArgs[portIdx +
 // Filter out --host/--port and their values from command args
 const commandOnlyArgs = [];
 for (let i = 0; i < cliArgs.length; i++) {
-    if (i === hostIdx || i === hostIdx + 1 || i === portIdx || i === portIdx + 1) continue;
+    // Must check hostIdx/portIdx >= 0 to avoid -1 + 1 === 0 matching the command arg
+    if ((hostIdx >= 0 && (i === hostIdx || i === hostIdx + 1)) ||
+        (portIdx >= 0 && (i === portIdx || i === portIdx + 1))) continue;
     commandOnlyArgs.push(cliArgs[i]);
 }
 const command = commandOnlyArgs[0];
