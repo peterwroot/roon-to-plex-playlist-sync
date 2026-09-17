@@ -125,7 +125,7 @@ class RoonApiConfig:
     """Configuration for connecting to Roon Core."""
 
     core_ip: str = "localhost"
-    core_port: int = 9330  # Default Roon Core websocket port
+    core_port: int = 9410  # Default Roon Core websocket port
     # The extension ID registered in Roon
     extension_id: str = "com.github.ptroth.roon-to-plex-sync"
     token_file: str = "roon_api_token"
