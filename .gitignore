@@ -1,0 +1,1 @@
+# Python\n__pycache__/\n*.py[cod]\n*.egg-info/\n.venv/\n.env\n\n# IDE\n.vscode/\n.idea/\n.DS_Store\n
