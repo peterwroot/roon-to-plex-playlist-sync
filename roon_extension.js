@@ -16,7 +16,7 @@
  *   node roon_extension.js get_playlist:"My Playlist Name"
  *
  *   # Or connect directly to a known Core (skip UDP discovery)
- *   node roon_extension.js --host 192.168.1.100 --port 9410 list_playlists
+ *   node roon_extension.js --host 192.168.1.100 --port 9330 list_playlists
  *
  * The extension auto-discovers Roon Cores on the local network, or connects
  * directly if --host and --port are provided.
