@@ -26,8 +26,6 @@ import json
 import logging
 import os
 import subprocess
-import sys
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
@@ -71,8 +69,18 @@ class RoonExtensionClient:
     See https://github.com/RoonLabs/node-roon-api for setup details.
     """
 
-    def __init__(self, extension_script: Optional[str] = None):
+    def __init__(self, extension_script: Optional[str] = None, core_host: Optional[str] = None, core_port: Optional[int] = None):
         self.extension_script = extension_script or self._default_extension_path()
+        self.core_host = core_host
+        self.core_port = core_port
+
+    def _build_command(self, command: str) -> list[str]:
+        """Build the full node command with optional host/port flags."""
+        cmd = ["node", self.extension_script]
+        if self.core_host and self.core_port:
+            cmd.extend(["--host", self.core_host, "--port", str(self.core_port)])
+        cmd.append(command)
+        return cmd
 
     def _default_extension_path(self) -> str:
         """Path to the bundled roon_extension.js script."""
@@ -94,16 +102,9 @@ class RoonExtensionClient:
                 "Ensure node-roon-api and its dependencies are installed."
             )
 
+        cmd = self._build_command(command)
         result = subprocess.run(
-            [sys.executable, "-c", f"""
-import subprocess, sys, json
-proc = subprocess.run(['node', {repr(self.extension_script)}, {repr(command)}],
-                      capture_output=True, text=True, timeout=60)
-if proc.returncode != 0:
-    print(json.dumps({{"error": proc.stderr}}), file=sys.stderr)
-    sys.exit(1)
-print(proc.stdout)
-"""],
+            cmd,
             capture_output=True,
             text=True,
             timeout=120,
@@ -167,7 +168,10 @@ class RoonApiBrowser:
 
     def _run(self, command: str) -> dict:
         if self._client is None:
-            self._client = RoonExtensionClient()
+            self._client = RoonExtensionClient(
+                core_host=self.config.core_ip,
+                core_port=self.config.core_port,
+            )
         return self._client._run_extension(command)
 
 
