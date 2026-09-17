@@ -263,6 +263,11 @@ function processCommand(core, cmd) {
 // Callback: called when Roon pairs us (extension authorisation accepted)
 function onCorePaired(core) {
     currentCore = core;
+    // Debug: log the parsed command for troubleshooting
+    if (process.env.DEBUG_ROON) {
+        console.error(`[DEBUG] process.argv: ${JSON.stringify(process.argv)}`);
+        console.error(`[DEBUG] command: "${command}"`);
+    }
     processCommand(core, command)
         .then(() => process.exit(0))
         .catch(e => {
