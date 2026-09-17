@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "roon-to-plex-playlist-sync"
+version = "0.1.0"
+description = "Synchronise playlists between Roon and Plex Media Server"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [{name = "Peter Wroot"}]
+dependencies = [
+    "PlexAPI>=4.18",
+    "PyYAML>=6.0",
+    "requests>=2.31",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+roon-to-plex-sync = "roon_to_plex_sync.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]

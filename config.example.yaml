@@ -1,0 +1,20 @@
+# Example configuration for Roon to Plex Playlist Sync
+# Copy to config.yaml and fill in your details.
+
+plex:
+  url: "http://localhost:32400"
+  token: "CHANGE_ME_YOUR_PLEX_TOKEN"
+  music_library_name: "Music"
+
+roon:
+  export_dir: "/path/to/roon/m3u/exports"
+  path_mappings: []
+  # Example path mapping for when Roon and Plex see different mount points:
+  # - roon_prefix: "/mnt/nas/music"
+  #   plex_prefix: "/data/music"
+
+sync:
+  playlist_prefix: ""
+  playlist_suffix: ""
+  dry_run: true
+  delete_missing: false

@@ -1,1 +1,18 @@
-# Python\n__pycache__/\n*.py[cod]\n*.egg-info/\n.venv/\n.env\n\n# IDE\n.vscode/\n.idea/\n.DS_Store\n
+# Python virtualenv
+.venv/
+
+# Distribution / packaging
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
