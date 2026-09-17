@@ -1,9 +1,8 @@
 /**
  * Roon Extension for Roon-to-Plex Playlist Sync.
  *
- * This extension connects to Roon Core and provides a JSON-over-stdout
- * interface to enumerate playlists and their tracks. It can also export
- * playlists as m3u files to a specified directory.
+ * This extension connects to Roon Core and provides commands to enumerate
+ * playlists and export them as m3u files.
  *
  * Setup:
  *   1. Install Node.js (>= 10.x)
@@ -16,7 +15,11 @@
  *   node roon_extension.js export_all:/path/to/m3u/exports
  *   node roon_extension.js get_playlist:"My Playlist Name"
  *
- * The extension auto-discovers Roon Cores on the local network.
+ *   # Or connect directly to a known Core (skip UDP discovery)
+ *   node roon_extension.js --host 192.168.1.100 --port 9410 list_playlists
+ *
+ * The extension auto-discovers Roon Cores on the local network, or connects
+ * directly if --host and --port are provided.
  * On first run, Roon will prompt you to authorise this extension.
  */
 
@@ -35,10 +38,23 @@ const appinfo = {
     website: 'https://github.com/peterwroot/roon-to-plex-playlist-sync',
 };
 
-const roon = new RoonApi(appinfo);
-
 // Store the paired core reference
 let currentCore = null;
+
+// Parse CLI args for optional host/port (direct connect instead of discovery)
+const cliArgs = process.argv.slice(2);
+const hostIdx = cliArgs.indexOf('--host');
+const portIdx = cliArgs.indexOf('--port');
+const directHost = hostIdx !== -1 ? cliArgs[hostIdx + 1] : null;
+const directPort = portIdx !== -1 && hostIdx !== -1 ? parseInt(cliArgs[portIdx + 1], 10) : null;
+
+// Filter out --host/--port and their values from command args
+const commandOnlyArgs = [];
+for (let i = 0; i < cliArgs.length; i++) {
+    if (i === hostIdx || i === hostIdx + 1 || i === portIdx || i === portIdx + 1) continue;
+    commandOnlyArgs.push(cliArgs[i]);
+}
+const command = commandOnlyArgs[0];
 
 /**
  * Browse the playlists hierarchy and return all playlist names + item keys.
@@ -57,7 +73,6 @@ function listPlaylists(core) {
                 return;
             }
 
-            // Load items at the current level (top-level playlists)
             browse.load({
                 hierarchy: 'playlists',
                 count: 1000,
@@ -90,7 +105,7 @@ function loadPlaylistTracks(core, itemKey) {
     return new Promise((resolve, reject) => {
         const browse = new RoonApiBrowse(core);
         const tracks = [];
-        let level = 1; // playlists are at level 0, tracks at level 1
+        const level = 1; // playlists are at level 0, tracks at level 1
 
         browse.browse({
             hierarchy: 'playlists',
@@ -123,7 +138,6 @@ function loadPlaylistTracks(core, itemKey) {
                         });
                     });
 
-                    // Check if there are more items
                     const list = body.list;
                     if (list && list.count && (offset || 0) + items.length < list.count) {
                         loadLevel((offset || 0) + items.length);
@@ -160,14 +174,9 @@ async function exportAllToM3u(exportDir) {
         try {
             const tracks = await loadPlaylistTracks(currentCore, pl.item_key);
 
-            // Build m3u content
             let m3u = '#EXTM3U\n';
             for (const t of tracks) {
-                // Roon browse doesn't include file paths, so we use the
-                // track metadata (artist - title) as fallback.
-                // For file paths, the user should use Roon's manual export.
-                const artistTitle = t.subtitle ? `${t.subtitle} - ${t.title}` : t.title;
-                const display = artistTitle || t.title || 'Unknown';
+                const display = t.subtitle ? `${t.subtitle} - ${t.title}` : t.title;
                 m3u += `#EXTINF:-1,${display}\n# Unknown path\n`;
             }
 
@@ -193,85 +202,107 @@ async function exportAllToM3u(exportDir) {
     return results;
 }
 
-// --- Main execution ---
+/**
+ * Process CLI commands after Roon Core is connected.
+ */
+function processCommand(core, cmd) {
+    if (!cmd) {
+        console.log(JSON.stringify({
+            error: 'No command specified.',
+            commands: ['list_playlists', 'export_all:<dir>', 'get_playlist:<name>'],
+        }));
+        process.exit(1);
+    }
 
-roon.init_services({
-    required_services: [RoonApiBrowse],
-    provided_services: [],
-});
+    if (cmd === 'list_playlists') {
+        return listPlaylists(core)
+            .then(playlists => {
+                console.log(JSON.stringify({ playlists: playlists }));
+            });
+    }
 
-roon.start_discovery({
-    // If you want to auto-reject cores you're not interested in,
-    // you can do it here. Usually you just want to accept all.
-    core_paired: function (core) {
-        currentCore = core;
+    if (cmd.startsWith('export_all:')) {
+        const exportDir = cmd.substring('export_all:'.length);
+        return exportAllToM3u(exportDir)
+            .then(results => {
+                console.log(JSON.stringify({
+                    exported: results.length,
+                    results: results,
+                }));
+            });
+    }
 
-        // Process command-line arguments
-        const args = process.argv.slice(2);
-        if (args.length === 0) {
-            console.log(JSON.stringify({
-                error: 'No command specified. Usage: node roon_extension.js <command>',
-                commands: ['list_playlists', 'export_all:<dir>', 'get_playlist:<name>'],
-            }));
-            process.exit(0);
-        }
-
-        const command = args[0];
-
-        (async function () {
-            try {
-                if (command === 'list_playlists') {
-                    const playlists = await listPlaylists(core);
+    if (cmd.startsWith('get_playlist:')) {
+        const name = cmd.substring('get_playlist:'.length);
+        return listPlaylists(core)
+            .then(playlists => {
+                const found = playlists.find(p => p.name === name);
+                if (!found) {
                     console.log(JSON.stringify({
-                        playlists: playlists,
+                        error: `Playlist '${name}' not found`,
                     }));
-                } else if (command.startsWith('export_all:')) {
-                    const exportDir = command.substring('export_all:'.length);
-                    const results = await exportAllToM3u(exportDir);
-                    console.log(JSON.stringify({
-                        exported: results.length,
-                        results: results,
-                    }));
-                } else if (command.startsWith('get_playlist:')) {
-                    const name = command.substring('get_playlist:'.length);
-                    const playlists = await listPlaylists(core);
-                    const found = playlists.find(p => p.name === name);
-                    if (!found) {
-                        console.log(JSON.stringify({
-                            error: `Playlist '${name}' not found`,
-                        }));
-                    } else {
-                        const tracks = await loadPlaylistTracks(core, found.item_key);
+                    return;
+                }
+                return loadPlaylistTracks(core, found.item_key)
+                    .then(tracks => {
                         console.log(JSON.stringify({
                             playlist: name,
                             tracks: tracks,
                         }));
-                    }
-                } else {
-                    console.log(JSON.stringify({
-                        error: `Unknown command: ${command}`,
-                    }));
-                }
-            } catch (e) {
-                console.log(JSON.stringify({ error: e.message }));
-            }
-            process.exit(0);
-        })();
-    },
+                    });
+            });
+    }
 
-    core_unpaired: function (core) {
-        console.log(JSON.stringify({ error: 'Roon Core disconnected' }));
-        process.exit(1);
-    },
+    console.log(JSON.stringify({
+        error: `Unknown command: ${cmd}`,
+    }));
+    process.exit(1);
+}
+
+// --- Main execution ---
+// Callback: called when Roon pairs us (extension authorisation accepted)
+function onCorePaired(core) {
+    currentCore = core;
+    processCommand(core, command)
+        .then(() => process.exit(0))
+        .catch(e => {
+            console.log(JSON.stringify({ error: e.message }));
+            process.exit(1);
+        });
+}
+
+// Callback: called when Roon unpairs us
+function onCoreUnpaired(core) {
+    console.log(JSON.stringify({ error: 'Roon Core disconnected' }));
+    process.exit(1);
+}
+
+// The RoonApi constructor takes the callback handlers directly, so they're
+// stored in this.extension_opts — which init_services checks for core_paired.
+const roon = new RoonApi(Object.assign({}, appinfo, {
+    core_paired: onCorePaired,
+    core_unpaired: onCoreUnpaired,
+}));
+
+// Init services — browse is required for reading playlists
+roon.init_services({
+    required_services: [RoonApiBrowse],
 });
 
-// Timeout: if we don't connect within 30 seconds, give up
-setTimeout(function () {
-    if (!currentCore) {
-        console.log(JSON.stringify({
-            error: 'No Roon Core found within 30 seconds. ' +
-                   'Ensure Roon Core is running and on the same network.',
-        }));
-        process.exit(1);
-    }
-}, 30000);
+// Connect: use direct ws_connect if --host/--port provided, otherwise discover
+if (directHost && directPort) {
+    roon.ws_connect({ host: directHost, port: directPort });
+} else {
+    roon.start_discovery();
+    // Timeout if discovery doesn't find a core within 30 seconds
+    setTimeout(function () {
+        if (!currentCore) {
+            console.log(JSON.stringify({
+                error: 'No Roon Core found within 30 seconds. ' +
+                       'Ensure Roon Core is running on the same network, ' +
+                       'or use --host <ip> --port <port> to connect directly.',
+            }));
+            process.exit(1);
+        }
+    }, 30000);
+}
