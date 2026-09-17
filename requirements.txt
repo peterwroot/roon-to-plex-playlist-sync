@@ -2,3 +2,6 @@ PlexAPI>=4.18
 PyYAML>=6.0
 requests>=2.31
 rich>=13.0
+
+# Optional: for auto-detection of new m3u export files
+watchdog>=4.0

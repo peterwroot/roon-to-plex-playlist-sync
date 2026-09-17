@@ -1,0 +1,15 @@
+{
+  "name": "roon-to-plex-playlist-sync",
+  "version": "0.1.0",
+  "description": "Roon Extension for exporting playlists to m3u format",
+  "main": "roon_extension.js",
+  "scripts": {
+    "start": "node roon_extension.js"
+  },
+  "dependencies": {
+    "node-roon-api": "github:RoonLabs/node-roon-api",
+    "node-roon-api-browse": "github:RoonLabs/node-roon-api-browse"
+  },
+  "author": "Peter Wroot",
+  "license": "MIT"
+}
