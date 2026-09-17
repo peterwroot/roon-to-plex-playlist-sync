@@ -298,7 +298,28 @@ roon.init_services({
 
 // Connect: use direct ws_connect if --host/--port provided, otherwise discover
 if (directHost && directPort) {
-    roon.ws_connect({ host: directHost, port: directPort });
+    roon.ws_connect({
+        host: directHost,
+        port: directPort,
+        onerror: function(moo) {
+            console.log(JSON.stringify({
+                error: `WebSocket connection to ${directHost}:${directPort} failed. ` +
+                       `Is Roon Core running and is the port correct? ` +
+                       `(Default port is 9330)`,
+            }));
+            process.exit(1);
+        },
+    });
+    // Timeout for direct connect
+    setTimeout(function () {
+        if (!currentCore) {
+            console.log(JSON.stringify({
+                error: `No Roon Core found within 30 seconds at ${directHost}:${directPort}. `+
+                       `Check the host/port and ensure Roon Core is running.`,
+            }));
+            process.exit(1);
+        }
+    }, 30000);
 } else {
     roon.start_discovery();
     // Timeout if discovery doesn't find a core within 30 seconds
